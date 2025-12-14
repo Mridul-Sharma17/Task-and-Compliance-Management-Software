@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, CheckSquare, FileText, Calendar, Settings, PieChart, LogOut, ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, FileText, Calendar, Settings, PieChart, LogOut, ChevronLeft, ChevronRight, Menu, Building, Users } from 'lucide-react';
 import GlassPanel from './GlassPanel';
+import { useAuth } from '../src/contexts/AuthContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -9,14 +10,24 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { signOut, profile } = useAuth();
 
-  const menuItems = [
+  const adminMenuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'tasks', label: 'All Tasks', icon: CheckSquare },
+    { id: 'companies', label: 'Companies', icon: Building },
+    { id: 'users', label: 'Users', icon: Users },
+    { id: 'reports', label: 'Reports', icon: PieChart },
+    { id: 'calendar', label: 'Calendar', icon: Calendar },
+  ];
+
+  const partnerMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'tasks', label: 'My Tasks', icon: CheckSquare },
-    { id: 'filings', label: 'Filings', icon: FileText },
     { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'reports', label: 'Reports', icon: PieChart },
   ];
+
+  const menuItems = profile?.role === 'admin' ? adminMenuItems : partnerMenuItems;
 
   return (
     <GlassPanel className={`h-full flex flex-col p-4 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'} !rounded-none border-y-0 border-l-0 z-10`}>
@@ -89,15 +100,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
       {/* Bottom Actions */}
       <div className="mt-auto pt-6 border-t border-slate-200/50 space-y-2">
-        <button 
-            className={`w-full flex items-center p-3 rounded-xl text-slate-500 hover:bg-white/40 hover:text-slate-700 transition-colors ${isCollapsed ? 'justify-center' : ''}`}
+        <button
+            onClick={() => setActiveTab('settings')}
+            className={`w-full flex items-center p-3 rounded-xl text-slate-500 hover:bg-white/40 hover:text-slate-700 transition-colors ${isCollapsed ? 'justify-center' : ''} ${activeTab === 'settings' ? 'bg-white/60 text-sea-600' : ''}`}
             title={isCollapsed ? "Settings" : undefined}
         >
           <Settings size={20} className="flex-shrink-0" />
           {!isCollapsed && <span className="ml-3 font-medium whitespace-nowrap">Settings</span>}
         </button>
         
-        <button 
+        <button
+            onClick={signOut}
             className={`w-full flex items-center p-3 rounded-xl text-rose-500 hover:bg-rose-50 hover:text-rose-600 transition-colors ${isCollapsed ? 'justify-center' : ''}`}
             title={isCollapsed ? "Logout" : undefined}
         >

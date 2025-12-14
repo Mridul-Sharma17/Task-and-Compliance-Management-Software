@@ -1,7 +1,7 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
 import GlassPanel from './GlassPanel';
-import { Task } from '../types';
+import { Task } from '../src/services/taskService';
 
 interface DashboardProps {
   tasks: Task[];

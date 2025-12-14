@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Calendar, User, Flag, Paperclip, CheckCircle2, Circle } from 'lucide-react';
-import { Task, Priority } from '../types';
+import { Task } from '../src/services/taskService';
 import GlassPanel from './GlassPanel';
+import DocumentUpload from './DocumentUpload';
+import DocumentList from './DocumentList';
+
+type Priority = 'high' | 'medium' | 'low';
 
 interface TaskModalProps {
   task: Task | null;
@@ -11,22 +15,42 @@ interface TaskModalProps {
 
 const PriorityBadge: React.FC<{ priority: Priority }> = ({ priority }) => {
   const colors = {
-    High: 'text-rose-600 bg-rose-50 ring-1 ring-rose-200',
-    Medium: 'text-amber-600 bg-amber-50 ring-1 ring-amber-200',
-    Low: 'text-sky-600 bg-sky-50 ring-1 ring-sky-200',
+    high: 'text-rose-600 bg-rose-50 ring-1 ring-rose-200',
+    medium: 'text-amber-600 bg-amber-50 ring-1 ring-amber-200',
+    low: 'text-sky-600 bg-sky-50 ring-1 ring-sky-200',
   };
 
   return (
     <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${colors[priority]}`}>
-      {priority} Priority
+      {priority.charAt(0).toUpperCase() + priority.slice(1)} Priority
     </span>
   );
 };
 
 const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onToggleStatus }) => {
+  const [refreshDocuments, setRefreshDocuments] = useState(0);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
   if (!task) return null;
 
-  const isCompleted = task.status === 'Completed';
+  const isCompleted = task.status === 'completed';
+
+  const handleToggleStatus = () => {
+    if (!isCompleted) {
+      // Show confirmation only when marking as complete
+      setShowConfirmation(true);
+    } else {
+      // Directly mark as incomplete
+      onToggleStatus(task.id);
+      onClose();
+    }
+  };
+
+  const confirmComplete = () => {
+    setShowConfirmation(false);
+    onToggleStatus(task.id);
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -62,7 +86,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onToggleStatus }) 
           </h2>
           <div className="text-sea-600 font-medium mb-6 flex items-center gap-2">
              <span className="w-2 h-2 rounded-full bg-sea-400"></span>
-             {task.client}
+             {task.company?.name || 'Unknown Company'}
           </div>
 
           <div className="grid grid-cols-2 gap-6 mb-8">
@@ -72,18 +96,32 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onToggleStatus }) 
               </div>
               <div>
                 <p className="text-xs text-slate-400 font-medium uppercase">Due Date</p>
-                <p className="text-sm font-medium">{new Date(task.dueDate).toLocaleDateString()}</p>
+                <p className="text-sm font-medium">{task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No date'}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3 text-slate-600">
               <div className="p-2 bg-slate-50 rounded-lg">
                 <User size={18} className="text-slate-400" />
               </div>
               <div>
                 <p className="text-xs text-slate-400 font-medium uppercase">Assignee</p>
-                <p className="text-sm font-medium">{task.assignee}</p>
+                <p className="text-sm font-medium">{typeof task.assignee === 'string' ? task.assignee : task.assignee?.full_name || 'Unassigned'}</p>
               </div>
+            </div>
+          </div>
+
+          {/* Progress Section */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-slate-700">Progress</h3>
+              <span className="text-sm font-medium text-slate-600">{task.progress}%</span>
+            </div>
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-sea-500 transition-all duration-300"
+                style={{ width: `${task.progress}%` }}
+              />
             </div>
           </div>
 
@@ -94,15 +132,26 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onToggleStatus }) 
             </p>
           </div>
 
-          {/* Attachments Placeholder */}
+          {/* Attachments Section */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-700">Attachments</h3>
-                <button className="text-xs font-medium text-sea-600 hover:text-sea-700">Add New</button>
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Documents</h3>
+
+            {/* Document List */}
+            <div className="mb-4">
+              <DocumentList
+                key={refreshDocuments}
+                taskId={task.id}
+                onDocumentDeleted={() => setRefreshDocuments(prev => prev + 1)}
+              />
             </div>
-            <div className="border border-dashed border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50/50 hover:border-sea-300 transition-colors cursor-pointer group">
-                <Paperclip size={24} className="mb-2 group-hover:text-sea-500 transition-colors" />
-                <span className="text-sm">Click to upload working papers or drafts</span>
+
+            {/* Document Upload */}
+            <div className="mb-2">
+              <p className="text-xs text-slate-500 mb-3">Add new documents:</p>
+              <DocumentUpload
+                taskId={task.id}
+                onUploadSuccess={() => setRefreshDocuments(prev => prev + 1)}
+              />
             </div>
           </div>
         </div>
@@ -117,15 +166,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onToggleStatus }) 
               ))}
            </div>
            
-           <button 
-             onClick={() => {
-                onToggleStatus(task.id);
-                if (!isCompleted) onClose();
-             }}
+           <button
+             onClick={handleToggleStatus}
              className={`
                 flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium shadow-sm transition-all active:scale-95
-                ${isCompleted 
-                    ? 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700' 
+                ${isCompleted
+                    ? 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                     : 'bg-sea-500 text-white hover:bg-sea-600 shadow-sea-500/20'}
              `}
            >
@@ -140,6 +186,41 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onToggleStatus }) 
            </button>
         </div>
       </GlassPanel>
+
+      {/* Confirmation Dialog */}
+      {showConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setShowConfirmation(false)}
+          />
+
+          {/* Dialog */}
+          <GlassPanel className="relative max-w-md bg-white/70 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 space-y-4">
+              <h3 className="text-lg font-semibold text-slate-800">Mark Task Complete?</h3>
+              <p className="text-sm text-slate-600">
+                Are you sure you want to mark <span className="font-medium">"{task.title}"</span> as complete?
+              </p>
+              <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+                <button
+                  onClick={() => setShowConfirmation(false)}
+                  className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmComplete}
+                  className="px-4 py-2 rounded-lg bg-sea-500 text-white hover:bg-sea-600 transition"
+                >
+                  Mark Complete
+                </button>
+              </div>
+            </div>
+          </GlassPanel>
+        </div>
+      )}
     </div>
   );
 };
