@@ -40,13 +40,24 @@ export function useRealtimeTasks() {
             console.log('Realtime event received:', payload.eventType, payload)
 
             if (payload.eventType === 'INSERT') {
+              // Fetch complete task with joined data
               const newTask = await taskService.getTask(payload.new.id)
-              setTasks(prev => [...prev, newTask])
+              if (newTask) {
+                setTasks(prev => {
+                  // Check if task already exists to avoid duplicates
+                  const exists = prev.some(t => t.id === newTask.id)
+                  if (exists) return prev
+                  return [newTask, ...prev]
+                })
+              }
             } else if (payload.eventType === 'UPDATE') {
+              // Fetch complete task with joined data
               const updatedTask = await taskService.getTask(payload.new.id)
-              setTasks(prev =>
-                prev.map(t => t.id === payload.new.id ? updatedTask : t)
-              )
+              if (updatedTask) {
+                setTasks(prev =>
+                  prev.map(t => t.id === updatedTask.id ? updatedTask : t)
+                )
+              }
             } else if (payload.eventType === 'DELETE') {
               setTasks(prev => prev.filter(t => t.id !== payload.old.id))
             }
