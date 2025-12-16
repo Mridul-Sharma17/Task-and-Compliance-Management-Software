@@ -35,6 +35,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session)
         setUser(session?.user ?? null)
 
+        // Update realtime auth token whenever session changes or refreshes
+        if (session?.access_token) {
+          console.log('🔄 Updating realtime auth token (session changed/refreshed)')
+          supabase.realtime.setAuth(session.access_token)
+        } else {
+          console.log('🔓 No session - realtime auth cleared')
+        }
+
         // Clear profile immediately when user changes or logs out
         // This prevents showing the wrong user's profile
         setProfile(null)
@@ -50,6 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
+
+      // Set initial realtime auth token
+      if (session?.access_token) {
+        console.log('🔑 Setting initial realtime auth token')
+        supabase.realtime.setAuth(session.access_token)
+      }
 
       // Fetch profile only after session is confirmed
       if (session?.user) {

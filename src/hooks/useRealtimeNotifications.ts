@@ -27,14 +27,13 @@ export function useRealtimeNotifications() {
       return
     }
 
+    console.log('✅ Session ready, setting up notifications realtime subscription')
+
     let channel: ReturnType<typeof supabase.channel> | null = null
     let mounted = true
 
     const setupNotificationSubscription = async () => {
       try {
-        // Explicitly set auth token for realtime
-        console.log('🔑 Setting notification realtime auth token for session')
-        supabase.realtime.setAuth(session.access_token)
 
         // Subscribe to task changes
         channel = supabase

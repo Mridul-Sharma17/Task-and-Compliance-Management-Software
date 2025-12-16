@@ -17,14 +17,12 @@ export function useRealtimeTasks() {
       try {
         // Wait for session to be ready
         if (!session) {
-          console.log('⏳ Waiting for session to be ready...')
+          console.log('⏳ Waiting for session to be ready for tasks subscription...')
           setLoading(false)
           return
         }
 
-        // Explicitly set auth token for realtime
-        console.log('🔑 Setting realtime auth token for session')
-        supabase.realtime.setAuth(session.access_token)
+        console.log('✅ Session ready, setting up tasks realtime subscription')
 
         // Fetch initial tasks
         try {
