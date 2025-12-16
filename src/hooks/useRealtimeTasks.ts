@@ -10,19 +10,20 @@ export function useRealtimeTasks() {
   const { session } = useAuth()
 
   useEffect(() => {
+    // Only run once when session first becomes available
+    // After that, auth token updates are handled globally in AuthContext
+    // Don't recreate subscription on token refresh
+    if (!session) {
+      console.log('⏳ Waiting for initial session...')
+      return
+    }
+
     let channel: ReturnType<typeof supabase.channel> | null = null
     let mounted = true
 
     const setupRealtimeSubscription = async () => {
       try {
-        // Wait for session to be ready
-        if (!session) {
-          console.log('⏳ Waiting for session to be ready for tasks subscription...')
-          setLoading(false)
-          return
-        }
-
-        console.log('✅ Session ready, setting up tasks realtime subscription')
+        console.log('🚀 Setting up tasks realtime subscription (one-time, session ready)')
 
         // Fetch initial tasks
         try {
@@ -112,11 +113,11 @@ export function useRealtimeTasks() {
     return () => {
       mounted = false
       if (channel) {
-        console.log('🧹 Cleaning up realtime subscription')
+        console.log('🧹 Cleaning up realtime subscription (component unmount)')
         supabase.removeChannel(channel)
       }
     }
-  }, [session])
+  }, [session ? session.user.id : null]) // Only run once when we first get a session
 
   return { tasks, loading, error, setTasks }
 }

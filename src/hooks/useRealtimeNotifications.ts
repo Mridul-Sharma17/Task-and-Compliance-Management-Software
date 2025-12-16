@@ -14,20 +14,17 @@ export interface Notification {
 
 export function useRealtimeNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const { user, profile, session } = useAuth()
+  const { user, profile } = useAuth()
 
   useEffect(() => {
+    // Only run once per user - don't recreate subscription on session/token changes
+    // Auth token updates are handled globally in AuthContext
     if (!user || !profile) {
       console.log('⏳ Waiting for user/profile to be ready...')
       return
     }
 
-    if (!session) {
-      console.log('⏳ Waiting for session to be ready for notifications...')
-      return
-    }
-
-    console.log('✅ Session ready, setting up notifications realtime subscription')
+    console.log('🚀 Setting up notifications realtime subscription (one-time, user ready)')
 
     let channel: ReturnType<typeof supabase.channel> | null = null
     let mounted = true
@@ -111,11 +108,11 @@ export function useRealtimeNotifications() {
     return () => {
       mounted = false
       if (channel) {
-        console.log('🧹 Cleaning up notification subscription')
+        console.log('🧹 Cleaning up notification subscription (user change)')
         supabase.removeChannel(channel)
       }
     }
-  }, [user?.id, profile?.role, session])
+  }, [user?.id, profile?.role]) // Only recreate if user changes, NOT on session refresh
 
   const markAsRead = (id: string) => {
     setNotifications(prev =>
