@@ -45,6 +45,13 @@ export function useRealtimeTasks() {
         // Subscribe to realtime changes AFTER auth is ready
         channel = supabase
           .channel('tasks-realtime-channel')
+          .on('system', {}, (payload) => {
+            // CRITICAL: This fires when postgres_changes is ACTUALLY ready
+            // Without this, SUBSCRIBED doesn't mean postgres_changes is connected
+            if (payload.extension === 'postgres_changes') {
+              console.log('✅ postgres_changes extension READY - now truly connected!')
+            }
+          })
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'tasks' },
@@ -88,7 +95,13 @@ export function useRealtimeTasks() {
           .subscribe((status, err) => {
             console.log('📡 Realtime subscription status:', status)
             if (status === 'SUBSCRIBED') {
-              console.log('✅ Successfully subscribed to realtime updates')
+              console.log('📡 Channel SUBSCRIBED (waiting for postgres_changes to be ready...)')
+            }
+            if (status === 'CHANNEL_ERROR') {
+              console.error('❌ Channel error:', err)
+            }
+            if (status === 'CLOSED') {
+              console.warn('🔴 Channel CLOSED unexpectedly')
             }
             if (err) {
               console.error('❌ Realtime subscription error:', err)

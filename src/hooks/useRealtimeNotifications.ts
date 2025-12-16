@@ -35,6 +35,12 @@ export function useRealtimeNotifications() {
         // Subscribe to task changes
         channel = supabase
           .channel('notifications-realtime-channel')
+          .on('system', {}, (payload) => {
+            // CRITICAL: This fires when postgres_changes is ACTUALLY ready
+            if (payload.extension === 'postgres_changes') {
+              console.log('✅ Notifications postgres_changes extension READY!')
+            }
+          })
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'tasks' },
@@ -90,7 +96,13 @@ export function useRealtimeNotifications() {
           .subscribe((status, err) => {
             console.log('🔔 Notification subscription status:', status)
             if (status === 'SUBSCRIBED') {
-              console.log('✅ Successfully subscribed to notification updates')
+              console.log('📡 Notifications SUBSCRIBED (waiting for postgres_changes...)')
+            }
+            if (status === 'CHANNEL_ERROR') {
+              console.error('❌ Notifications channel error:', err)
+            }
+            if (status === 'CLOSED') {
+              console.warn('🔴 Notifications channel CLOSED unexpectedly')
             }
             if (err) {
               console.error('❌ Notification subscription error:', err)
