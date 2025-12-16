@@ -17,91 +17,109 @@ export function useRealtimeNotifications() {
   const { user, profile } = useAuth()
 
   useEffect(() => {
-    const setupNotificationSubscription = async () => {
-      // Wait for session to be ready
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session || !user || !profile) {
-        console.warn('No active session for notification subscription')
-        return
-      }
-
-      // Explicitly set auth token for realtime
-      supabase.realtime.setAuth(session.access_token)
-
-      // Subscribe to task changes
-      const channel = supabase
-        .channel('task-notifications')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'tasks' },
-          async (payload) => {
-            console.log('Notification event received:', payload.eventType, payload)
-
-            // Filter based on role
-            const isAdmin = profile.role === 'admin' || profile.role === 'partner' || profile.role === 'manager'
-            const isAssignedToMe = payload.new?.assignee_id === user.id
-            const isCreatedByMe = payload.new?.created_by === user.id
-
-            // Admin sees all updates, staff/partner only see their tasks
-            if (!isAdmin && !isAssignedToMe && !isCreatedByMe) {
-              return
-            }
-
-            let message = ''
-            let type: Notification['type'] = 'task_updated'
-
-            if (payload.eventType === 'INSERT') {
-              message = `New task created: ${payload.new.title}`
-              type = 'task_created'
-            } else if (payload.eventType === 'UPDATE') {
-              if (payload.new.status === 'completed' && payload.old.status !== 'completed') {
-                message = `Task completed: ${payload.new.title}`
-                type = 'task_completed'
-              } else if (payload.new.assignee_id !== payload.old.assignee_id && payload.new.assignee_id === user.id) {
-                message = `Task assigned to you: ${payload.new.title}`
-                type = 'task_assigned'
-              } else {
-                message = `Task updated: ${payload.new.title}`
-                type = 'task_updated'
-              }
-            }
-
-            const notification: Notification = {
-              id: `${payload.new.id}-${Date.now()}`,
-              message,
-              type,
-              timestamp: new Date(),
-              taskId: payload.new.id,
-              taskTitle: payload.new.title,
-              read: false,
-            }
-
-            setNotifications(prev => [notification, ...prev])
-          }
-        )
-        .subscribe((status, err) => {
-          console.log('Notification subscription status:', status)
-          if (err) {
-            console.error('Notification subscription error:', err)
-          }
-        })
-
-      return channel
+    if (!user || !profile) {
+      console.log('No user or profile, skipping notification subscription')
+      return
     }
 
     let channel: ReturnType<typeof supabase.channel> | null = null
+    let mounted = true
 
-    setupNotificationSubscription().then((ch) => {
-      if (ch) channel = ch
-    })
+    const setupNotificationSubscription = async () => {
+      try {
+        // Wait for session to be ready
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (!session) {
+          console.warn('No active session for notification subscription')
+          return
+        }
+
+        // Explicitly set auth token for realtime
+        supabase.realtime.setAuth(session.access_token)
+        console.log('Notifications realtime auth token set')
+
+        // Subscribe to task changes
+        channel = supabase
+          .channel('notifications-realtime-channel')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'tasks' },
+            async (payload) => {
+              console.log('🔔 Notification event received:', payload.eventType, payload)
+
+              if (!mounted) return
+
+              // Filter based on role
+              const isAdmin = profile.role === 'admin' || profile.role === 'partner' || profile.role === 'manager'
+              const isAssignedToMe = payload.new?.assignee_id === user.id
+              const isCreatedByMe = payload.new?.created_by === user.id
+
+              // Admin sees all updates, staff/partner only see their tasks
+              if (!isAdmin && !isAssignedToMe && !isCreatedByMe) {
+                console.log('Notification filtered out (not relevant to user)')
+                return
+              }
+
+              let message = ''
+              let type: Notification['type'] = 'task_updated'
+
+              if (payload.eventType === 'INSERT') {
+                message = `New task created: ${payload.new.title}`
+                type = 'task_created'
+              } else if (payload.eventType === 'UPDATE') {
+                if (payload.new.status === 'completed' && payload.old.status !== 'completed') {
+                  message = `Task completed: ${payload.new.title}`
+                  type = 'task_completed'
+                } else if (payload.new.assignee_id !== payload.old.assignee_id && payload.new.assignee_id === user.id) {
+                  message = `Task assigned to you: ${payload.new.title}`
+                  type = 'task_assigned'
+                } else {
+                  message = `Task updated: ${payload.new.title}`
+                  type = 'task_updated'
+                }
+              }
+
+              const notification: Notification = {
+                id: `${payload.new.id}-${Date.now()}`,
+                message,
+                type,
+                timestamp: new Date(),
+                taskId: payload.new.id,
+                taskTitle: payload.new.title,
+                read: false,
+              }
+
+              console.log('➕ Adding notification:', message)
+              setNotifications(prev => [notification, ...prev])
+            }
+          )
+          .subscribe((status, err) => {
+            console.log('🔔 Notification subscription status:', status)
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Successfully subscribed to notification updates')
+            }
+            if (err) {
+              console.error('❌ Notification subscription error:', err)
+            }
+          })
+
+        console.log('Notification channel created:', channel)
+      } catch (err: any) {
+        console.error('Failed to setup notifications:', err)
+      }
+    }
+
+    setupNotificationSubscription()
 
     return () => {
+      mounted = false
       if (channel) {
+        console.log('🧹 Cleaning up notification subscription')
         supabase.removeChannel(channel)
       }
     }
-  }, [user, profile])
+  }, [user?.id, profile?.role])
 
   const markAsRead = (id: string) => {
     setNotifications(prev =>
