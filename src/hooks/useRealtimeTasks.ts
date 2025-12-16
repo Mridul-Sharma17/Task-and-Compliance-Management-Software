@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Task, taskService } from '../services/taskService'
+import { useAuth } from '../contexts/AuthContext'
 
 export function useRealtimeTasks() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { session } = useAuth()
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -14,17 +16,15 @@ export function useRealtimeTasks() {
     const setupRealtimeSubscription = async () => {
       try {
         // Wait for session to be ready
-        const { data: { session } } = await supabase.auth.getSession()
-
         if (!session) {
-          console.warn('No active session for realtime subscription')
+          console.log('⏳ Waiting for session to be ready...')
           setLoading(false)
           return
         }
 
         // Explicitly set auth token for realtime
+        console.log('🔑 Setting realtime auth token for session')
         supabase.realtime.setAuth(session.access_token)
-        console.log('Realtime auth token set')
 
         // Fetch initial tasks
         try {
@@ -118,7 +118,7 @@ export function useRealtimeTasks() {
         supabase.removeChannel(channel)
       }
     }
-  }, [])
+  }, [session])
 
   return { tasks, loading, error, setTasks }
 }

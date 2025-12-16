@@ -14,11 +14,16 @@ export interface Notification {
 
 export function useRealtimeNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const { user, profile } = useAuth()
+  const { user, profile, session } = useAuth()
 
   useEffect(() => {
     if (!user || !profile) {
-      console.log('No user or profile, skipping notification subscription')
+      console.log('⏳ Waiting for user/profile to be ready...')
+      return
+    }
+
+    if (!session) {
+      console.log('⏳ Waiting for session to be ready for notifications...')
       return
     }
 
@@ -27,17 +32,9 @@ export function useRealtimeNotifications() {
 
     const setupNotificationSubscription = async () => {
       try {
-        // Wait for session to be ready
-        const { data: { session } } = await supabase.auth.getSession()
-
-        if (!session) {
-          console.warn('No active session for notification subscription')
-          return
-        }
-
         // Explicitly set auth token for realtime
+        console.log('🔑 Setting notification realtime auth token for session')
         supabase.realtime.setAuth(session.access_token)
-        console.log('Notifications realtime auth token set')
 
         // Subscribe to task changes
         channel = supabase
@@ -119,7 +116,7 @@ export function useRealtimeNotifications() {
         supabase.removeChannel(channel)
       }
     }
-  }, [user?.id, profile?.role])
+  }, [user?.id, profile?.role, session])
 
   const markAsRead = (id: string) => {
     setNotifications(prev =>
