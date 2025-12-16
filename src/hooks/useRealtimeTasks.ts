@@ -61,10 +61,11 @@ export function useRealtimeTasks() {
               if (!mounted) return
 
               if (payload.eventType === 'INSERT') {
-                // Fetch complete task with joined data
-                const newTask = await taskService.getTask(payload.new.id)
-                if (newTask && mounted) {
-                  console.log('➕ Adding new task:', newTask.title)
+                // Use payload.new directly - it has all the data we need
+                // Fetching again can fail due to RLS or network issues
+                if (mounted) {
+                  const newTask = payload.new as Task
+                  console.log('➕ Adding new task from realtime:', newTask.title)
                   setTasks(prev => {
                     // Check if task already exists to avoid duplicates
                     const exists = prev.some(t => t.id === newTask.id)
@@ -76,10 +77,10 @@ export function useRealtimeTasks() {
                   })
                 }
               } else if (payload.eventType === 'UPDATE') {
-                // Fetch complete task with joined data
-                const updatedTask = await taskService.getTask(payload.new.id)
-                if (updatedTask && mounted) {
-                  console.log('✏️ Updating task:', updatedTask.title)
+                // Use payload.new directly
+                if (mounted) {
+                  const updatedTask = payload.new as Task
+                  console.log('✏️ Updating task from realtime:', updatedTask.title)
                   setTasks(prev =>
                     prev.map(t => t.id === updatedTask.id ? updatedTask : t)
                   )
