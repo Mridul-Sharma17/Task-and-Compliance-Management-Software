@@ -14,13 +14,13 @@ export interface Notification {
 
 export function useRealtimeNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const { user, profile } = useAuth()
+  const { user, profile, session } = useAuth()
 
   useEffect(() => {
     // Only run once per user - don't recreate subscription on session/token changes
     // Auth token updates are handled globally in AuthContext
-    if (!user || !profile) {
-      console.log('⏳ Waiting for user/profile to be ready...')
+    if (!user || !profile || !session) {
+      console.log('⏳ Waiting for user/profile/session to be ready...')
       return
     }
 
@@ -31,6 +31,10 @@ export function useRealtimeNotifications() {
 
     const setupNotificationSubscription = async () => {
       try {
+        // CRITICAL: Set auth token RIGHT before creating channel
+        // This ensures auth is set for THIS specific channel creation
+        console.log('🔑 Setting realtime auth token before notification channel creation')
+        supabase.realtime.setAuth(session.access_token)
 
         // Subscribe to task changes
         channel = supabase

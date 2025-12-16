@@ -42,6 +42,11 @@ export function useRealtimeTasks() {
           }
         }
 
+        // CRITICAL: Set auth token RIGHT before creating channel
+        // This ensures auth is set for THIS specific channel creation
+        console.log('🔑 Setting realtime auth token before channel creation')
+        supabase.realtime.setAuth(session.access_token)
+
         // Subscribe to realtime changes AFTER auth is ready
         channel = supabase
           .channel('tasks-realtime-channel')
